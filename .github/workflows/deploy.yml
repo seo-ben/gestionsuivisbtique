@@ -15,16 +15,9 @@ jobs:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐘 Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, json
-          coverage: none
-
       - name: 📦 Install Composer dependencies
         run: |
-          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --ignore-platform-reqs
 
       - name: ⚙️ Prepare Production .env
         run: |
