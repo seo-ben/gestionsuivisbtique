@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AutorisationController;
 use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\ClotureCaisseController;
+use App\Http\Controllers\Api\DepenseController;
 use App\Http\Controllers\Api\EmpruntController;
 use App\Http\Controllers\Api\PaiementBoutiquierController;
 use App\Http\Controllers\Api\ProduitController;
@@ -76,9 +77,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('emprunts', EmpruntController::class)->only(['index', 'store', 'show']);
     Route::put('echeances/{echeance}/payer', [EmpruntController::class, 'payerEcheance']);
 
+    // ── DÉPENSES & CHARGES D'EXPLOITATION ───────
+    Route::apiResource('depenses', DepenseController::class)->only(['index', 'store', 'destroy']);
+
     // ── RAPPORTS & DASHBOARD ──────────────────
     Route::get('dashboard',                              [RapportController::class, 'dashboard']);
     Route::get('boutiques/{boutique}/rapports/journalier', [RapportController::class, 'journalier']);
     Route::get('boutiques/{boutique}/rapports/mensuel',    [RapportController::class, 'mensuel']);
     Route::get('vendeurs/{vendeur}/ecarts',               [RapportController::class, 'ecartVendeur']);
+
+    // ── SYSTEM MIGRATION (Admin Only) ──────────
+    Route::post('system/migrate', function () {
+        abort_if(!request()->user()->isAdmin(), 403);
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        return response()->json([
+            'output' => \Illuminate\Support\Facades\Artisan::output(),
+        ]);
+    });
 });

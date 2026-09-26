@@ -114,9 +114,16 @@ class RapportController extends Controller
             $ventesQuery = $boutique->ventes()->whereBetween('date_vente', [$dateDebut, $dateFin]);
             $totalVentes  = $ventesQuery->sum('montant_total');
             $nbVentes     = $ventesQuery->count();
-            $totalSorties = $boutique->reapprovisionnements()
+            $reapprosSorties = $boutique->reapprovisionnements()
                 ->whereBetween('date_reappro', [$dateDebut, $dateFin])
                 ->sum('montant_depense');
+            $depensesBoutique = \Illuminate\Support\Facades\Schema::hasTable('depenses')
+                ? (float) \App\Models\Depense::where('boutique_id', $boutique->id)
+                    ->where('deduire_de_caisse', true)
+                    ->whereBetween('date_depense', [$dateDebut, $dateFin])
+                    ->sum('montant')
+                : 0.0;
+            $totalSorties = (float) ($reapprosSorties + $depensesBoutique);
             $stockAlerte  = $boutique->produits()
                 ->where('actif', true)
                 ->whereNotNull('seuil_alerte_stock')
@@ -134,8 +141,17 @@ class RapportController extends Controller
             ];
         });
 
+        $depensesGenerales = \Illuminate\Support\Facades\Schema::hasTable('depenses')
+            ? (float) \App\Models\Depense::where('admin_id', $request->user()->id)
+                ->whereNull('boutique_id')
+                ->whereBetween('date_depense', [$dateDebut, $dateFin])
+                ->sum('montant')
+            : 0.0;
+
         $periodeStr = $dateDebut === $dateFin ? $dateDebut : "Du $dateDebut au $dateFin";
-        $totalVentesGlobal = (float) $data->sum('total_ventes');
+        $totalVentesGlobal  = (float) $data->sum('total_ventes');
+        $totalSortiesGlobal = (float) ($data->sum('total_sorties') + $depensesGenerales);
+        $soldeNetGlobal     = (float) ($totalVentesGlobal - $totalSortiesGlobal);
         $panierMoyen = $nbVentesTotal > 0 ? round($totalVentesGlobal / $nbVentesTotal, 0) : 0;
 
         return response()->json([
@@ -145,11 +161,12 @@ class RapportController extends Controller
             'boutiques'    => $data,
             'top_produits' => $topProduits,
             'totaux'       => [
-                'ventes'       => $totalVentesGlobal,
-                'sorties'      => (float) $data->sum('total_sorties'),
-                'solde'        => (float) $data->sum('solde_jour'),
-                'nb_ventes'    => $nbVentesTotal,
-                'panier_moyen' => $panierMoyen,
+                'ventes'             => $totalVentesGlobal,
+                'sorties'            => $totalSortiesGlobal,
+                'depenses_generales' => $depensesGenerales,
+                'solde'              => $soldeNetGlobal,
+                'nb_ventes'          => $nbVentesTotal,
+                'panier_moyen'       => $panierMoyen,
             ],
         ]);
     }
