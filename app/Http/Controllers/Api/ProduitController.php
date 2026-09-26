@@ -58,9 +58,16 @@ class ProduitController extends Controller
             'prix_actuel'               => 'sometimes|numeric|min:0',
             'unite_reference'           => 'nullable|string|max:30',
             'vendeur_peut_modifier_prix' => 'sometimes|boolean',
+            'stock_actuel'              => 'nullable|numeric|min:0',
             'seuil_alerte_stock'        => 'nullable|numeric|min:0',
             'actif'                     => 'sometimes|boolean',
         ]);
+
+        if (array_key_exists('stock_actuel', $data) && $data['stock_actuel'] !== null) {
+            $totalReappros = (float) $produit->reapprovisionnements()->sum('quantite');
+            $totalVentes   = (float) $produit->ventes()->sum('quantite');
+            $data['stock_initial'] = (float) $data['stock_actuel'] - $totalReappros + $totalVentes;
+        }
 
         $produit->update($data);
         return response()->json($produit->fresh());
