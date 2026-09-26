@@ -5,6 +5,22 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
+$cacheDir = __DIR__.'/cache';
+if (file_exists($cacheDir.'/packages.php')) {
+    $packagesContent = @file_get_contents($cacheDir.'/packages.php');
+    if ($packagesContent && str_contains($packagesContent, 'PailServiceProvider')) {
+        @unlink($cacheDir.'/packages.php');
+        @unlink($cacheDir.'/services.php');
+    }
+}
+if (file_exists($cacheDir.'/services.php')) {
+    $servicesContent = @file_get_contents($cacheDir.'/services.php');
+    if ($servicesContent && str_contains($servicesContent, 'PailServiceProvider')) {
+        @unlink($cacheDir.'/services.php');
+        @unlink($cacheDir.'/packages.php');
+    }
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
