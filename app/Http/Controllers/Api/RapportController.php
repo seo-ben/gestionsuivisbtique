@@ -101,8 +101,8 @@ class RapportController extends Controller
             ->whereBetween('date_vente', [$dateDebut, $dateFin])
             ->count();
 
-        $topProduits = \App\Models\Vente::whereIn('boutique_id', $boutiqueIds)
-            ->whereBetween('date_vente', [$dateDebut, $dateFin])
+        $topProduits = \App\Models\Vente::whereIn('ventes.boutique_id', $boutiqueIds)
+            ->whereBetween('ventes.date_vente', [$dateDebut, $dateFin])
             ->join('produits', 'produits.id', '=', 'ventes.produit_id')
             ->groupBy('ventes.produit_id', 'produits.nom', 'produits.unite_reference')
             ->selectRaw('produits.nom, produits.unite_reference, CAST(SUM(ventes.quantite) AS DECIMAL(12,2)) as quantite_totale, CAST(SUM(ventes.montant_total) AS DECIMAL(12,2)) as montant_total')
