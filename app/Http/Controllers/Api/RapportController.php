@@ -87,15 +87,21 @@ class RapportController extends Controller
     {
         abort_if(!$request->user()->isAdmin(), 403);
 
-        $today    = now()->toDateString();
+        $dateDebut = $request->query('debut', $request->query('date', now()->toDateString()));
+        $dateFin   = $request->query('fin', $dateDebut);
+
         $boutiques = $request->user()->boutiquesAdmin()
             ->where('actif', true)
             ->with(['parametres'])
             ->get();
 
-        $data = $boutiques->map(function ($boutique) use ($today) {
-            $totalVentes  = $boutique->ventes()->whereDate('date_vente', $today)->sum('montant_total');
-            $totalSorties = $boutique->reapprovisionnements()->whereDate('date_reappro', $today)->sum('montant_depense');
+        $data = $boutiques->map(function ($boutique) use ($dateDebut, $dateFin) {
+            $totalVentes  = $boutique->ventes()
+                ->whereBetween('date_vente', [$dateDebut, $dateFin])
+                ->sum('montant_total');
+            $totalSorties = $boutique->reapprovisionnements()
+                ->whereBetween('date_reappro', [$dateDebut, $dateFin])
+                ->sum('montant_depense');
             $stockAlerte  = $boutique->produits()
                 ->where('actif', true)
                 ->whereNotNull('seuil_alerte_stock')
@@ -105,20 +111,24 @@ class RapportController extends Controller
             return [
                 'id'            => $boutique->id,
                 'nom'           => $boutique->nom,
-                'total_ventes'  => $totalVentes,
-                'total_sorties' => $totalSorties,
-                'solde_jour'    => $totalVentes - $totalSorties,
+                'total_ventes'  => (float) $totalVentes,
+                'total_sorties' => (float) $totalSorties,
+                'solde_jour'    => (float) ($totalVentes - $totalSorties),
                 'produits_en_alerte_stock' => $stockAlerte,
             ];
         });
 
+        $periodeStr = $dateDebut === $dateFin ? $dateDebut : "Du $dateDebut au $dateFin";
+
         return response()->json([
-            'date'      => $today,
-            'boutiques' => $data,
-            'totaux'    => [
-                'ventes'  => $data->sum('total_ventes'),
-                'sorties' => $data->sum('total_sorties'),
-                'solde'   => $data->sum('solde_jour'),
+            'date'       => $periodeStr,
+            'date_debut' => $dateDebut,
+            'date_fin'   => $dateFin,
+            'boutiques'  => $data,
+            'totaux'     => [
+                'ventes'  => (float) $data->sum('total_ventes'),
+                'sorties' => (float) $data->sum('total_sorties'),
+                'solde'   => (float) $data->sum('solde_jour'),
             ],
         ]);
     }
