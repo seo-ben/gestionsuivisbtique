@@ -95,10 +95,25 @@ class RapportController extends Controller
             ->with(['parametres'])
             ->get();
 
+        $boutiqueIds = $boutiques->pluck('id');
+
+        $nbVentesTotal = \App\Models\Vente::whereIn('boutique_id', $boutiqueIds)
+            ->whereBetween('date_vente', [$dateDebut, $dateFin])
+            ->count();
+
+        $topProduits = \App\Models\Vente::whereIn('boutique_id', $boutiqueIds)
+            ->whereBetween('date_vente', [$dateDebut, $dateFin])
+            ->join('produits', 'produits.id', '=', 'ventes.produit_id')
+            ->groupBy('ventes.produit_id', 'produits.nom', 'produits.unite_reference')
+            ->selectRaw('produits.nom, produits.unite_reference, CAST(SUM(ventes.quantite) AS DECIMAL(12,2)) as quantite_totale, CAST(SUM(ventes.montant_total) AS DECIMAL(12,2)) as montant_total')
+            ->orderByDesc('montant_total')
+            ->limit(5)
+            ->get();
+
         $data = $boutiques->map(function ($boutique) use ($dateDebut, $dateFin) {
-            $totalVentes  = $boutique->ventes()
-                ->whereBetween('date_vente', [$dateDebut, $dateFin])
-                ->sum('montant_total');
+            $ventesQuery = $boutique->ventes()->whereBetween('date_vente', [$dateDebut, $dateFin]);
+            $totalVentes  = $ventesQuery->sum('montant_total');
+            $nbVentes     = $ventesQuery->count();
             $totalSorties = $boutique->reapprovisionnements()
                 ->whereBetween('date_reappro', [$dateDebut, $dateFin])
                 ->sum('montant_depense');
@@ -114,21 +129,27 @@ class RapportController extends Controller
                 'total_ventes'  => (float) $totalVentes,
                 'total_sorties' => (float) $totalSorties,
                 'solde_jour'    => (float) ($totalVentes - $totalSorties),
+                'nb_ventes'     => $nbVentes,
                 'produits_en_alerte_stock' => $stockAlerte,
             ];
         });
 
         $periodeStr = $dateDebut === $dateFin ? $dateDebut : "Du $dateDebut au $dateFin";
+        $totalVentesGlobal = (float) $data->sum('total_ventes');
+        $panierMoyen = $nbVentesTotal > 0 ? round($totalVentesGlobal / $nbVentesTotal, 0) : 0;
 
         return response()->json([
-            'date'       => $periodeStr,
-            'date_debut' => $dateDebut,
-            'date_fin'   => $dateFin,
-            'boutiques'  => $data,
-            'totaux'     => [
-                'ventes'  => (float) $data->sum('total_ventes'),
-                'sorties' => (float) $data->sum('total_sorties'),
-                'solde'   => (float) $data->sum('solde_jour'),
+            'date'         => $periodeStr,
+            'date_debut'   => $dateDebut,
+            'date_fin'     => $dateFin,
+            'boutiques'    => $data,
+            'top_produits' => $topProduits,
+            'totaux'       => [
+                'ventes'       => $totalVentesGlobal,
+                'sorties'      => (float) $data->sum('total_sorties'),
+                'solde'        => (float) $data->sum('solde_jour'),
+                'nb_ventes'    => $nbVentesTotal,
+                'panier_moyen' => $panierMoyen,
             ],
         ]);
     }
