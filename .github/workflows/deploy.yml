@@ -1,0 +1,53 @@
+name: Deploy Laravel Backend to LWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & FTP Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐘 Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, bcmath, json
+          coverage: none
+
+      - name: 📦 Install Composer dependencies
+        run: |
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+      - name: ⚙️ Prepare Production .env
+        run: |
+          if [ -n "${{ secrets.LARAVEL_ENV }}" ]; then
+            echo "${{ secrets.LARAVEL_ENV }}" > .env
+          else
+            echo "LARAVEL_ENV secret is empty, skipping .env generation."
+          fi
+
+      - name: 🚀 Deploy via FTP to LWS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.digitalforges.org
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            Dockerfile
+            .dockerignore
+            phpunit.xml
+            vite.config.js
