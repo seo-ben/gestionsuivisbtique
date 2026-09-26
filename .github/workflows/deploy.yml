@@ -25,6 +25,8 @@ jobs:
       - name: 📦 Install Composer dependencies
         run: |
           composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+          rm -f bootstrap/cache/*.php
+          php artisan package:discover --ansi
 
       - name: ⚙️ Prepare Production .env
         run: |
